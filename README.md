@@ -24,7 +24,7 @@
 
 - `groupId`: `com.neroyun`
 - `artifactId`: `mediator`
-- `version`: `1.0.0`
+- `version`: ${VERSION}
 - 测试依赖：`org.junit.jupiter:junit-jupiter:6.0.3`
 - 编译版本：`maven.compiler.source/target = 25`
 
@@ -100,7 +100,7 @@ mediator.send(new UserCreateCommand("Alice", "alice@example.com"));
 <dependency>
     <groupId>com.neroyun</groupId>
     <artifactId>mediator</artifactId>
-    <version>1.0.0</version>
+    <version>${VERSION}</version>
 </dependency>
 ```
 
