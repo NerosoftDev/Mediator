@@ -9,7 +9,7 @@ import com.neroyun.mediator.validation.ValidationResult;
  * Implementations of this interface can be used to ensure that messages meet certain criteria or constraints before they are handled by the appropriate handlers in the mediator pattern.
  * @param <T> the type of message to be validated. Only messages that extend the Validatable class can be validated using this interface, ensuring that the validation logic is specific to the types of messages being processed in the mediator pattern.
  */
-public interface Validator<T extends Validatable & Message> {
+public interface Validator<T extends Validatable & Message<?>> {
 
     /**
      * Validates the given message and returns a ValidationResult indicating whether the validation was successful or if there were any errors.

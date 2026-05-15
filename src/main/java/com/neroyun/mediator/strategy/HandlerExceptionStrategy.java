@@ -18,13 +18,13 @@ public @interface HandlerExceptionStrategy {
     /**
      * Stops the processing of the message if an exception occurs in any handler.
      */
-    public final String STOP = "STOP";
+    String STOP = "STOP";
 
     /**
      * Continues to the next handler if an exception occurs in the current handler.
      * This allows other handlers to attempt to process the message, even if one handler fails.
      */
-    public final String CONTINUE = "CONTINUE";
+    String CONTINUE = "CONTINUE";
 
     String value() default CONTINUE;
 }

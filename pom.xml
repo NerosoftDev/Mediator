@@ -6,7 +6,7 @@
 
     <groupId>com.neroyun</groupId>
     <artifactId>mediator</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>Mediator</name>
     <description>A simple mediator pattern implementation in Java</description>
     <url>https://github.com/nerosoftdev/mediator</url>
@@ -44,6 +44,12 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>24.1.0</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

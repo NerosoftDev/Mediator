@@ -2,6 +2,9 @@
 
 一个轻量级的 Java Mediator 组件，用于在 CQRS 场景下统一处理 `Command`、`Query`、`Event`，并支持中间件管道、消息验证和事件并行策略。
 
+[![Maven Central](https://img.shields.io/maven-central/v/com.neroyun/mediator)](https://central.sonatype.com/artifact/com.neroyun/mediator)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/NerosoftDev/Mediator/blob/master/LICENSE)
+
 ## 项目简介
 
 `Mediator` 通过“消息 + 处理器”的模式解耦业务调用方与实现方：
@@ -18,13 +21,18 @@
 - 支持事件并行分发策略（`HandlerParallelStrategy`）
 - 支持事件异常处理策略（`HandlerExceptionStrategy`）
 
+## 环境要求
+
+- Java 17+
+- Maven
+
 ## 依赖与环境
 
 项目为 Maven 工程（见 `pom.xml`）：
 
 - `groupId`: `com.neroyun`
 - `artifactId`: `mediator`
-- `version`: `1.0.0`
+- `version`: ${VERSION}
 - 测试依赖：`org.junit.jupiter:junit-jupiter:6.0.3`
 - 编译版本：`maven.compiler.source/target = 25`
 
@@ -100,7 +108,7 @@ mediator.send(new UserCreateCommand("Alice", "alice@example.com"));
 <dependency>
     <groupId>com.neroyun</groupId>
     <artifactId>mediator</artifactId>
-    <version>1.0.0</version>
+    <version>${VERSION}</version>
 </dependency>
 ```
 
