@@ -82,7 +82,7 @@ public class PipelinedMediator implements Mediator {
 
         List<Runnable> tasks = handlers.supply()
                 .filter(handler -> handler.matches(event))
-                .map(handler -> (Handler<Event, ?>) handler)
+                .map(handler -> (Handler<Event, Void>) handler)
                 .map(handler -> (Runnable) () -> {
                     var pipeline = buildMiddlewarePipeline(event, () -> handler.handle(event));
                     pipeline.invoke();
