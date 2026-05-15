@@ -88,6 +88,92 @@ mediator.send(new UserCreateCommand("Alice", "alice@example.com"));
 
 如校验失败，会抛出 `ValidationException`，可通过 `getErrors()` 读取错误列表。
 
+## Spring Boot 集成方法
+
+本项目本身不依赖 Spring；推荐在你的 Spring Boot 业务工程中引入该库后，通过 `@Configuration` 装配 `Mediator`。
+
+### 1. 在业务工程引入依赖
+
+如果你已将该库发布到私有仓库或本地仓库，可在业务工程 `pom.xml` 中添加：
+
+```xml
+<dependency>
+    <groupId>com.nerosoft</groupId>
+    <artifactId>Mediator</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+### 2. 将 Handler / Validator / Middleware 交给 Spring 管理
+
+```java
+@Component
+public class UserCreateCommandHandler implements Handler<UserCreateCommand, Void> {
+    @Override
+    public Void handle(UserCreateCommand message) {
+        return null;
+    }
+}
+
+@Component
+public class UserCreateCommandValidator implements Validator<UserCreateCommand> {
+    @Override
+    public ValidationResult validate(UserCreateCommand message) {
+        return ValidationResult.success();
+    }
+}
+```
+
+### 3. 在配置类中组装 `PipelinedMediator`
+
+```java
+import com.nerosoft.mediator.*;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.concurrent.Executors;
+
+@Configuration
+public class MediatorConfiguration {
+
+    @Bean
+    public Mediator mediator(ApplicationContext applicationContext) {
+        return new PipelinedMediator()
+                .use(() -> applicationContext.getBeansOfType(Handler.class).values().stream())
+                .use(() -> applicationContext.getBeansOfType(Validator.class).values().stream())
+                .use(() -> applicationContext.getBeansOfType(Middleware.class).values().stream())
+                .use(() -> Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
+    }
+}
+```
+
+### 4. 在业务服务中使用
+
+```java
+import com.nerosoft.mediator.Mediator;
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserApplicationService {
+    private final Mediator mediator;
+
+    public UserApplicationService(Mediator mediator) {
+        this.mediator = mediator;
+    }
+
+    public void createUser(String name, String email) {
+        mediator.send(new UserCreateCommand(name, email));
+    }
+}
+```
+
+说明：
+
+- `Handler` 默认按“消息泛型类型”匹配
+- 多个 `Middleware` 会按流顺序组成责任链
+- `Validator` 返回失败时会抛出 `ValidationException`，可统一在全局异常处理中转换为 HTTP 响应
+
 ## Event 并行策略（可选）
 
 给事件类型添加注解控制并发行为：
