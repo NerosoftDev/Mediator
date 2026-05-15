@@ -9,5 +9,5 @@ import com.nerosoft.mediator.internal.Validatable;
  *
  * @param <R> the type of the response expected from the query.
  */
-public interface Query<R> extends Message, Validatable {
+public interface Query<R> extends Message<R>, Validatable {
 }

@@ -8,5 +8,5 @@ import com.nerosoft.mediator.internal.Validatable;
  * A command is an instruction to perform a specific action, and it typically does not expect a response.
  * Commands are used to change the state of the system or to trigger some behavior.
  */
-public interface Command extends Message, Validatable {
+public interface Command extends Message<Void>, Validatable {
 }
