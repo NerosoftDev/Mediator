@@ -22,7 +22,7 @@ public class ValidationException extends RuntimeException {
      * Creates a new ValidationException with the specified list of error messages.
      * @param errors the list of error messages describing the validation failure
      */
-    private ValidationException(List<String> errors) {
+    public ValidationException(List<String> errors) {
         super("Validation failed: " + String.join(", ", errors));
         this.result = ValidationResult.failure(errors);
     }
