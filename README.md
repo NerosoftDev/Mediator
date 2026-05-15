@@ -22,8 +22,8 @@
 
 项目为 Maven 工程（见 `pom.xml`）：
 
-- `groupId`: `com.nerosoft`
-- `artifactId`: `Mediator`
+- `groupId`: `com.neroyun`
+- `artifactId`: `mediator`
 - `version`: `1.0.0`
 - 测试依赖：`org.junit.jupiter:junit-jupiter:6.0.3`
 - 编译版本：`maven.compiler.source/target = 25`
@@ -98,8 +98,8 @@ mediator.send(new UserCreateCommand("Alice", "alice@example.com"));
 
 ```xml
 <dependency>
-    <groupId>com.nerosoft</groupId>
-    <artifactId>Mediator</artifactId>
+    <groupId>com.neroyun</groupId>
+    <artifactId>mediator</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
@@ -127,7 +127,8 @@ public class UserCreateCommandValidator implements Validator<UserCreateCommand> 
 ### 3. 在配置类中组装 `PipelinedMediator`
 
 ```java
-import com.nerosoft.mediator.*;
+
+import com.neroyun.mediator.*;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -137,34 +138,34 @@ import java.util.concurrent.Executors;
 @Configuration
 public class MediatorConfiguration {
 
-    @Bean
-    public Mediator mediator(ApplicationContext applicationContext) {
-        return new PipelinedMediator()
-                .use(() -> applicationContext.getBeansOfType(Handler.class).values().stream())
-                .use(() -> applicationContext.getBeansOfType(Validator.class).values().stream())
-                .use(() -> applicationContext.getBeansOfType(Middleware.class).values().stream())
-                .use(() -> Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
-    }
+  @Bean
+  public Mediator mediator(ApplicationContext applicationContext) {
+    return new PipelinedMediator()
+            .use(() -> applicationContext.getBeansOfType(Handler.class).values().stream())
+            .use(() -> applicationContext.getBeansOfType(Validator.class).values().stream())
+            .use(() -> applicationContext.getBeansOfType(Middleware.class).values().stream())
+            .use(() -> Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
+  }
 }
 ```
 
 ### 4. 在业务服务中使用
 
 ```java
-import com.nerosoft.mediator.Mediator;
+import com.neroyun.mediator.Mediator;
 import org.springframework.stereotype.Service;
 
 @Service
 public class UserApplicationService {
-    private final Mediator mediator;
+  private final Mediator mediator;
 
-    public UserApplicationService(Mediator mediator) {
-        this.mediator = mediator;
-    }
+  public UserApplicationService(Mediator mediator) {
+    this.mediator = mediator;
+  }
 
-    public void createUser(String name, String email) {
-        mediator.send(new UserCreateCommand(name, email));
-    }
+  public void createUser(String name, String email) {
+    mediator.send(new UserCreateCommand(name, email));
+  }
 }
 ```
 
@@ -181,9 +182,12 @@ public class UserApplicationService {
 ### 1. 中间件接口
 
 ```java
+import com.neroyun.mediator.internal.Message;
+import com.neroyun.mediator.internal.MiddlewareDelegate;
+
 @FunctionalInterface
 public interface Middleware {
-    Object handle(com.nerosoft.mediator.internal.Message message, com.nerosoft.mediator.internal.MiddlewareDelegate next);
+  Object handle(internal.com.neroyun.mediator.Message message, internal.com.neroyun.mediator.MiddlewareDelegate next);
 }
 ```
 
@@ -280,15 +284,15 @@ public class UserCreatedEvent implements Event {}
 
 ## 包内容
 
-- `com.nerosoft.mediator`
+- `com.neroyun.mediator`
   - 核心抽象：`Mediator`、`Command`、`Query`、`Event`
   - 扩展点：`Handler`、`Middleware`、`Validator`
   - 默认实现：`PipelinedMediator`
-- `com.nerosoft.mediator.strategy`
+- `com.neroyun.mediator.strategy`
   - 事件并行与异常策略注解
-- `com.nerosoft.mediator.validation`
+- `com.neroyun.mediator.validation`
   - `ValidationResult`、`ValidationException`
-- `com.nerosoft.mediator.internal`
+- `com.neroyun.mediator.internal`
   - 内部支持类型（消息基类、流供应器、异常聚合等）
 
 ## 快速构建
