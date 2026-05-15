@@ -174,6 +174,94 @@ public class UserApplicationService {
 - 多个 `Middleware` 会按流顺序组成责任链
 - `Validator` 返回失败时会抛出 `ValidationException`，可统一在全局异常处理中转换为 HTTP 响应
 
+## 中间件使用方法
+
+`Middleware` 用于在消息进入 `Handler` 之前或之后插入通用逻辑，适合做日志、耗时统计、权限检查、审计、链路追踪等横切处理。
+
+### 1. 中间件接口
+
+```java
+@FunctionalInterface
+public interface Middleware {
+    Object handle(com.nerosoft.mediator.internal.Message message, com.nerosoft.mediator.internal.MiddlewareDelegate next);
+}
+```
+
+其中：
+
+- `message`：当前正在处理的消息
+- `next`：责任链中的下一个中间件或最终 `Handler`
+
+### 2. 注册中间件
+
+在创建 `PipelinedMediator` 时，通过 `.use(() -> Stream.of(...))` 传入中间件流：
+
+```java
+Mediator mediator = new PipelinedMediator()
+        .use(() -> java.util.stream.Stream.of(new UserCreateCommandHandler()))
+        .use(() -> java.util.stream.Stream.of(new UserCreateCommandValidator()))
+        .use(() -> java.util.stream.Stream.of(
+                (message, next) -> {
+                    System.out.println("before: " + message.getClass().getSimpleName());
+                    try {
+                        return next.invoke();
+                    } finally {
+                        System.out.println("after: " + message.getClass().getSimpleName());
+                    }
+                }
+        ));
+```
+
+### 3. 执行顺序
+
+中间件会按照注册顺序形成链式调用：
+
+1. 第一个中间件先执行
+2. 调用 `next.invoke()` 进入下一个中间件
+3. 最后到达对应的 `Handler`
+4. 返回结果后，中间件可以继续做收尾处理
+
+如果你注册了多个中间件，它们的执行顺序与传入流的顺序一致。
+
+### 4. 常见使用场景
+
+#### 日志与耗时统计
+
+```java
+(message, next) -> {
+    long start = System.nanoTime();
+    try {
+        return next.invoke();
+    } finally {
+        long cost = System.nanoTime() - start;
+        System.out.println("cost(ns): " + cost);
+    }
+}
+```
+
+#### 权限或参数预检查
+
+```java
+(message, next) -> {
+    if (message == null) {
+        throw new IllegalArgumentException("message can not be null");
+    }
+    return next.invoke();
+}
+```
+
+### 5. 与 Spring Boot 结合
+
+如果项目已集成 Spring Boot，可以把中间件声明成 `@Component`，然后在配置类中统一注入到 `PipelinedMediator`：
+
+```java
+@Bean
+public Mediator mediator(ApplicationContext applicationContext) {
+    return new PipelinedMediator()
+            .use(() -> applicationContext.getBeansOfType(Middleware.class).values().stream());
+}
+```
+
 ## Event 并行策略（可选）
 
 给事件类型添加注解控制并发行为：
