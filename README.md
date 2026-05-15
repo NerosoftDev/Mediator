@@ -23,7 +23,7 @@
 项目为 Maven 工程（见 `pom.xml`）：
 
 - `groupId`: `com.neroyun`
-- `artifactId`: `Mediator`
+- `artifactId`: `mediator`
 - `version`: `1.0.0`
 - 测试依赖：`org.junit.jupiter:junit-jupiter:6.0.3`
 - 编译版本：`maven.compiler.source/target = 25`
