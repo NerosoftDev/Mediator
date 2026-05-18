@@ -6,7 +6,7 @@
 
     <groupId>com.neroyun</groupId>
     <artifactId>mediator</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <name>Mediator</name>
     <description>A simple mediator pattern implementation in Java</description>
     <url>https://github.com/nerosoftdev/mediator</url>

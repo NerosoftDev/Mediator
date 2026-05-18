@@ -1,10 +1,13 @@
 package com.neroyun.mediator;
 
+import com.neroyun.mediator.internal.QueryCallback;
+
 /**
  * Defines the Mediator interface for handling commands, queries, and events.
  * The Mediator pattern promotes loose coupling between components by centralizing communication.
  * This interface can be implemented to create a concrete mediator that manages the interactions between various components in the system.
  */
+@SuppressWarnings("unused")
 public interface Mediator {
 
     /**
@@ -26,11 +29,11 @@ public interface Mediator {
     /**
      * Executes a query and provides the result to the specified response handler.
      * @param query the query to be executed
-     * @param response the response handler
+     * @param callback the callback to handle the result of the query
      * @param <T> the type of the query
      * @param <R> the type of the result
      */
-    <T extends Query<R>, R> void execute(T query, R response);
+    <T extends Query<R>, R> void execute(T query, QueryCallback<R> callback);
 
     /**
      * Publishes an event to all interested handlers.
