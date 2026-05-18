@@ -73,22 +73,22 @@ public class PipelinedMediator implements Mediator {
     }
 
     @Override
-    public <T extends Query<R>, R> void execute(@NotNull T query, R response) {
+    public <T extends Query<R>, R> void execute(@NotNull T query, QueryCallback<R> callback) {
         checkArguments(query, "Query can not be null.");
+        var result = execute(query);
+        if (callback != null) {
+            callback.onCompleted(result);
+        }
     }
 
     @Override
     public <T extends Event> void publish(@NotNull T event) {
         checkArguments(event, "Event can not be null.");
 
-        List<Runnable> tasks = handlers.supply()
-                .filter(handler -> handler.matches(event))
-                .map(handler -> (Handler<Event, Void>) handler)
-                .map(handler -> (Runnable) () -> {
-                    var pipeline = buildMiddlewarePipeline(event, () -> handler.handle(event));
-                    pipeline.invoke();
-                })
-                .toList();
+        List<Runnable> tasks = handlers.supply().filter(handler -> handler.matches(event)).map(handler -> (Handler<Event, Void>) handler).map(handler -> (Runnable) () -> {
+            var pipeline = buildMiddlewarePipeline(event, () -> handler.handle(event));
+            pipeline.invoke();
+        }).toList();
 
         if (tasks.isEmpty()) {
             return;
@@ -134,11 +134,7 @@ public class PipelinedMediator implements Mediator {
      */
     private <T extends Message<R>, R> Handler<T, R> resolveHandler(T message) {
         // resolve handler from handlers stream
-        return handlers.supply()
-                .filter(handler -> handler.matches(message))
-                .map(handler -> (Handler<T, R>) handler)
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("No handler found for message: " + message.getClass().getName()));
+        return handlers.supply().filter(handler -> handler.matches(message)).map(handler -> (Handler<T, R>) handler).findFirst().orElseThrow(() -> new RuntimeException("No handler found for message: " + message.getClass().getName()));
     }
 
     /**
@@ -150,11 +146,7 @@ public class PipelinedMediator implements Mediator {
      * @param <R>     the type of the response produced by the message handler
      */
     private <T extends Validatable & Message<R>, R> void validate(T message) {
-        var errors = validators.supply()
-                .map(validator -> validator.validate(message))
-                .filter(ValidationResult::isFailure)
-                .flatMap(result -> result.errors().stream())
-                .toList();
+        var errors = validators.supply().map(validator -> validator.validate(message)).filter(ValidationResult::isFailure).flatMap(result -> result.errors().stream()).toList();
         if (!errors.isEmpty()) {
             throw new ValidationException(errors);
         }
