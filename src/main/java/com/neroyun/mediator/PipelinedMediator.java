@@ -5,7 +5,6 @@ import com.neroyun.mediator.strategy.HandlerExceptionStrategy;
 import com.neroyun.mediator.strategy.HandlerParallelStrategy;
 import com.neroyun.mediator.validation.ValidationException;
 import com.neroyun.mediator.validation.ValidationResult;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Objects;
@@ -34,28 +33,28 @@ public class PipelinedMediator implements Mediator {
      * @param handlers the stream of handlers to be used by the mediator
      * @return the current instance of PipelinedMediator for method chaining
      */
-    public PipelinedMediator use(@NotNull HandlerStream handlers) {
+    public PipelinedMediator use(HandlerStream handlers) {
         this.handlers = handlers::supply;
         return this;
     }
 
-    public PipelinedMediator use(@NotNull MiddlewareStream middlewares) {
+    public PipelinedMediator use(MiddlewareStream middlewares) {
         this.middlewares = middlewares::supply;
         return this;
     }
 
-    public PipelinedMediator use(@NotNull ValidatorStream validators) {
+    public PipelinedMediator use(ValidatorStream validators) {
         this.validators = validators::supply;
         return this;
     }
 
-    public PipelinedMediator use(@NotNull Supplier<ExecutorService> concurrentPolicy) {
+    public PipelinedMediator use(Supplier<ExecutorService> concurrentPolicy) {
         this.concurrentPolicy = concurrentPolicy;
         return this;
     }
 
     @Override
-    public <T extends Command> void send(@NotNull T command) {
+    public <T extends Command> void send(T command) {
         checkArguments(command, "Command can not be null.");
         validate(command);
         var handler = resolveHandler(command);
@@ -64,7 +63,7 @@ public class PipelinedMediator implements Mediator {
     }
 
     @Override
-    public <T extends Query<R>, R> R execute(@NotNull T query) {
+    public <T extends Query<R>, R> R execute(T query) {
         checkArguments(query, "Query can not be null.");
         validate(query);
         var handler = resolveHandler(query);
@@ -73,7 +72,7 @@ public class PipelinedMediator implements Mediator {
     }
 
     @Override
-    public <T extends Query<R>, R> void execute(@NotNull T query, QueryCallback<R> callback) {
+    public <T extends Query<R>, R> void execute(T query, QueryCallback<R> callback) {
         checkArguments(query, "Query can not be null.");
         var result = execute(query);
         if (callback != null) {
@@ -82,7 +81,7 @@ public class PipelinedMediator implements Mediator {
     }
 
     @Override
-    public <T extends Event> void publish(@NotNull T event) {
+    public <T extends Event> void publish(T event) {
         checkArguments(event, "Event can not be null.");
 
         List<Runnable> tasks = handlers.supply().filter(handler -> handler.matches(event)).map(handler -> (Handler<Event, Void>) handler).map(handler -> (Runnable) () -> {
