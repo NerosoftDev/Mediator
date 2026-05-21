@@ -1,7 +1,6 @@
 package com.neroyun.mediator.validation;
 
 import java.util.List;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Represents an exception that is thrown when validation fails in the mediator pattern.
@@ -21,6 +20,7 @@ public class ValidationException extends RuntimeException {
 
     /**
      * Creates a new ValidationException with the specified list of error messages.
+     *
      * @param errors the list of error messages describing the validation failure
      */
     public ValidationException(List<String> errors) {
@@ -30,6 +30,7 @@ public class ValidationException extends RuntimeException {
 
     /**
      * Creates a new ValidationException with the specified list of error messages.
+     *
      * @param message the error message describing the validation failure
      */
     public ValidationException(String message) {
@@ -39,19 +40,19 @@ public class ValidationException extends RuntimeException {
 
     /**
      * Gets the ValidationResult associated with this exception, which contains the details of the validation failure, including any error messages.
+     *
      * @return the ValidationResult associated with this exception
      */
-    @NotNull
     public ValidationResult getResult() {
         return result;
     }
 
     /**
      * Gets the list of error messages describing the validation failure.
+     *
      * @return the list of error messages describing the validation failure
      */
     @SuppressWarnings("unused")
-    @NotNull
     public List<String> getErrors() {
         return result.errors();
     }

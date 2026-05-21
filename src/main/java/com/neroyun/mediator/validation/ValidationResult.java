@@ -1,7 +1,6 @@
 package com.neroyun.mediator.validation;
 
 import java.util.List;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Defines the result of a validation operation, which can be either successful or failed with a list of error messages.
@@ -9,7 +8,7 @@ import org.jetbrains.annotations.NotNull;
  * The ValidationResult class is designed to be immutable and thread-safe, making it suitable for use in concurrent environments where multiple threads may be performing validation operations simultaneously.
  * By encapsulating the validation result in a dedicated class, it promotes a clear and consistent way to handle validation outcomes throughout the application, allowing for better error handling and improved code readability when dealing with validation logic in the mediator pattern.
  */
-public record ValidationResult(@NotNull List<String> errors) {
+public record ValidationResult(List<String> errors) {
     private static final ValidationResult SUCCESS = new ValidationResult(List.of());
 
     public static ValidationResult success() {
@@ -32,7 +31,7 @@ public record ValidationResult(@NotNull List<String> errors) {
         return !isSuccess();
     }
 
-    @NotNull
+    @SuppressWarnings("NullableProblems")
     @Override
     public String toString() {
         return isSuccess() ? "ValidationResult{success}" : "ValidationResult{failure, errors=" + errors + "}";
