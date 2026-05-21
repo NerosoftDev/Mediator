@@ -18,7 +18,8 @@ public class PipelinedMediatorTest {
 
     @Test
     void testMediator() {
-        mediator.send(new UserCreateCommand("John Doe", "johndoe@sample.com"));
+        // Wait for async command to complete
+        mediator.sendAsync(new UserCreateCommand("John Doe", "johndoe@sample.com")).join();
 
         var users = UserStore.getInstance().getUsers();
         assert users.size() == 1;
@@ -30,10 +31,10 @@ public class PipelinedMediatorTest {
         // Arrange
         UserCreatedEvent event = new UserCreatedEvent(1234L, "Event Test User");
 
-        // Act & Assert - should not throw exception
-        mediator.publish(event);
+        // Act - wait for async event publishing to complete
+        mediator.publishAsync(event).join();
 
-        // Event publishing is asynchronous, so we just verify it doesn't throw
+        // Assert - event publishing completed without throwing
         assert true;
     }
 }

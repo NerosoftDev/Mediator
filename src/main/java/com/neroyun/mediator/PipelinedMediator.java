@@ -8,15 +8,16 @@ import com.neroyun.mediator.validation.ValidationResult;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * This class is an implementation of the Mediator interface that provides a pipelined approach to handling commands, queries, and events.
- * It allows for the processing of commands, queries, and events in a sequential manner, where each command, query,
- * or event is processed one at a time, and the next one is not processed until the current one is completed.
+ * This class is an implementation of the Mediator interface that provides an asynchronous pipelined approach to handling commands, queries, and events.
+ * It allows for the processing of commands, queries, and events in an asynchronous manner using CompletableFuture,
+ * providing better performance and scalability through non-blocking operations.
  * This can be useful in scenarios where the order of processing is important,
  * or when there are dependencies between commands, queries, and events that need to be respected.
  */
@@ -54,70 +55,110 @@ public class PipelinedMediator implements Mediator {
     }
 
     @Override
-    public <T extends Command> void send(T command) {
-        checkArguments(command, "Command can not be null.");
-        validate(command);
-        var handler = resolveHandler(command);
-        var pipeline = buildMiddlewarePipeline(command, () -> handler.handle(command));
-        pipeline.invoke();
+    public <T extends Command> CompletableFuture<Void> sendAsync(T command) {
+        return CompletableFuture.supplyAsync(() -> {
+            checkArguments(command, "Command can not be null.");
+            validate(command);
+            return resolveHandler(command);
+        }, concurrentPolicy.get()).thenCompose(handler -> {
+            MiddlewareDelegate pipeline = buildMiddlewarePipeline(command, () -> handler.handleAsync(command).thenApply(v -> v));
+            return pipeline.invokeAsync();
+        }).thenApply(result -> null);
     }
 
     @Override
-    public <T extends Query<R>, R> R execute(T query) {
-        checkArguments(query, "Query can not be null.");
-        validate(query);
-        var handler = resolveHandler(query);
-        var pipeline = buildMiddlewarePipeline(query, () -> handler.handle(query));
-        return (R) pipeline.invoke();
+    public <T extends Query<R>, R> CompletableFuture<R> executeAsync(T query) {
+        return CompletableFuture.supplyAsync(() -> {
+            checkArguments(query, "Query can not be null.");
+            validate(query);
+            return resolveHandler(query);
+        }, concurrentPolicy.get()).thenCompose(handler -> {
+            MiddlewareDelegate pipeline = buildMiddlewarePipeline(query, () -> handler.handleAsync(query).thenApply(r -> r));
+            return pipeline.invokeAsync();
+        }).thenApply(result -> (R) result);
     }
 
     @Override
-    public <T extends Query<R>, R> void execute(T query, QueryCallback<R> callback) {
-        checkArguments(query, "Query can not be null.");
-        var result = execute(query);
-        if (callback != null) {
-            callback.onCompleted(result);
-        }
-    }
-
-    @Override
-    public <T extends Event> void publish(T event) {
-        checkArguments(event, "Event can not be null.");
-
-        List<Runnable> tasks = handlers.supply().filter(handler -> handler.matches(event)).map(handler -> (Handler<Event, Void>) handler).map(handler -> (Runnable) () -> {
-            var pipeline = buildMiddlewarePipeline(event, () -> handler.handle(event));
-            pipeline.invoke();
-        }).toList();
-
-        if (tasks.isEmpty()) {
-            return;
-        }
-
-        HandlerParallelStrategy parallelStrategy = event.getClass().getAnnotation(HandlerParallelStrategy.class);
-        HandlerExceptionStrategy exceptionStrategy = event.getClass().getAnnotation(HandlerExceptionStrategy.class);
-
-        var parallelStrategyValue = parallelStrategy != null ? parallelStrategy.value() : HandlerParallelStrategy.No_WAIT;
-        var exceptionStrategyValue = exceptionStrategy != null ? exceptionStrategy.value() : HandlerExceptionStrategy.CONTINUE;
-
-        List<Throwable> exceptions = new java.util.ArrayList<>();
-
-        ExceptionHandle exceptionHandle = exception -> {
-            if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
-                throw new RuntimeException(exception);
-            } else {
-                exceptions.add(exception);
+    public <T extends Query<R>, R> CompletableFuture<Void> executeAsync(T query, QueryCallback<R> callback) {
+        return executeAsync(query).thenAccept(result -> {
+            if (callback != null) {
+                callback.onCompleted(result);
             }
-        };
+        });
+    }
 
-        switch (parallelStrategyValue) {
-            case HandlerParallelStrategy.No_WAIT -> Executor.run(tasks, concurrentPolicy.get(), exceptionHandle);
-            case HandlerParallelStrategy.WHEN_ALL -> Executor.whenAll(tasks, concurrentPolicy.get(), exceptionHandle);
-            case HandlerParallelStrategy.WHEN_ANY -> Executor.whenAny(tasks, concurrentPolicy.get(), exceptionHandle);
-        }
+    @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
+    @Override
+    public <T extends Event> CompletableFuture<Void> publishAsync(T event) {
+        return CompletableFuture.supplyAsync(() -> {
+            checkArguments(event, "Event can not be null.");
 
-        if (!exceptions.isEmpty()) {
-            throw new AggregateException(exceptions);
-        }
+            List<CompletableFuture<Void>> tasks = handlers.supply()
+                                                          .filter(handler -> handler.matches(event))
+                                                          .map(handler -> (Handler<Event, Void>) handler)
+                                                          .<CompletableFuture<Void>>map(handler -> {
+                                                              MiddlewareDelegate pipeline = buildMiddlewarePipeline(event, () -> handler.handleAsync(event).thenApply(v -> v));
+                                                              return pipeline.invokeAsync().thenApply(result -> null);
+                                                          })
+                                                          .toList();
+
+            if (tasks.isEmpty()) {
+                return CompletableFuture.<Void>completedFuture(null);
+            }
+
+            HandlerParallelStrategy parallelStrategy = event.getClass().getAnnotation(HandlerParallelStrategy.class);
+            HandlerExceptionStrategy exceptionStrategy = event.getClass().getAnnotation(HandlerExceptionStrategy.class);
+
+            var parallelStrategyValue = parallelStrategy != null ? parallelStrategy.value() : HandlerParallelStrategy.No_WAIT;
+            var exceptionStrategyValue = exceptionStrategy != null ? exceptionStrategy.value() : HandlerExceptionStrategy.CONTINUE;
+
+            List<Throwable> exceptions = new java.util.ArrayList<>();
+
+            switch (parallelStrategyValue) {
+                case HandlerParallelStrategy.No_WAIT -> {
+                    // Fire and forget
+                    tasks.forEach(task -> task.exceptionally(ex -> {
+                        if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
+                            throw new RuntimeException(ex);
+                        } else {
+                            synchronized (exceptions) {
+                                exceptions.add(ex);
+                            }
+                        }
+                        return null;
+                    }));
+                    return CompletableFuture.<Void>completedFuture(null);
+                }
+                case HandlerParallelStrategy.WHEN_ALL -> {
+                    // Wait for all
+                    return CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0]))
+                                            .exceptionally(ex -> {
+                                                if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
+                                                    throw new RuntimeException(ex);
+                                                } else {
+                                                    exceptions.add(ex);
+                                                }
+                                                return null;
+                                            });
+                }
+                case HandlerParallelStrategy.WHEN_ANY -> {
+                    // Wait for any
+                    return CompletableFuture.anyOf(tasks.toArray(new CompletableFuture[0]))
+                                            .thenApply(result -> null)
+                                            .exceptionally(ex -> {
+                                                if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
+                                                    throw new RuntimeException(ex);
+                                                } else {
+                                                    exceptions.add(ex);
+                                                }
+                                                return null;
+                                            });
+                }
+                default -> {
+                    return CompletableFuture.<Void>completedFuture(null);
+                }
+            }
+        }, concurrentPolicy.get()).thenCompose(future -> (CompletableFuture<Void>) future);
     }
 
     /**
@@ -132,7 +173,6 @@ public class PipelinedMediator implements Mediator {
      * @return the resolved handler for the given message
      */
     private <T extends Message<R>, R> Handler<T, R> resolveHandler(T message) {
-        // resolve handler from handlers stream
         return handlers.supply().filter(handler -> handler.matches(message)).map(handler -> (Handler<T, R>) handler).findFirst().orElseThrow(() -> new RuntimeException("No handler found for message: " + message.getClass().getName()));
     }
 
@@ -167,15 +207,15 @@ public class PipelinedMediator implements Mediator {
     }
 
     /**
-     * Builds a middleware pipeline for the given message and final action.
+     * Builds an asynchronous middleware pipeline for the given message and final action.
      * The pipeline is constructed by wrapping the final action with each applicable middleware in reverse order,
-     * allowing each middleware to process the message before and/or after the final action is invoked.
+     * allowing each middleware to process the message before and/or after the final action is invoked asynchronously.
      *
      * @param message     the message to be processed by the middleware pipeline
      * @param finalAction the final action to be executed after all middlewares have been applied
      * @param <T>         the type of the message
      * @param <R>         the type of the response produced by the message handler
-     * @return a delegate representing the complete middleware pipeline
+     * @return a delegate representing the complete asynchronous middleware pipeline
      */
     private <T extends Message<R>, R> MiddlewareDelegate buildMiddlewarePipeline(T message, MiddlewareDelegate finalAction) {
         var applicableMiddlewares = middlewares.supply().toList();
@@ -183,7 +223,7 @@ public class PipelinedMediator implements Mediator {
         for (int i = applicableMiddlewares.size() - 1; i >= 0; i--) {
             Middleware middleware = applicableMiddlewares.get(i);
             MiddlewareDelegate next = delegate;
-            delegate = () -> middleware.handle(message, next);
+            delegate = () -> middleware.handleAsync(message, next);
         }
         return delegate;
     }

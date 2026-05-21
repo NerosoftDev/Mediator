@@ -1,5 +1,6 @@
 package com.neroyun.mediator;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -10,19 +11,17 @@ public class UserEventCounterHandler implements Handler<UserCreatedEvent, Void> 
     private final AtomicInteger counter = new AtomicInteger(0);
 
     @Override
-    public Void handle(UserCreatedEvent message) {
-        counter.incrementAndGet();
-        System.out.printf("UserEventCounterHandler: Counted event for user %s (Total: %d)\n",
-                         message.name(), counter.get());
-        return null;
+    public CompletableFuture<Void> handleAsync(UserCreatedEvent message) {
+        return CompletableFuture.supplyAsync(() -> {
+            counter.incrementAndGet();
+            System.out.printf("UserEventCounterHandler: Counted event for user %s (Total: %d)\n",
+                             message.name(), counter.get());
+            return null;
+        });
     }
 
     public int getCount() {
         return counter.get();
-    }
-
-    public void reset() {
-        counter.set(0);
     }
 }
 

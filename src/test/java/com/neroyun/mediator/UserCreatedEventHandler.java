@@ -1,9 +1,11 @@
 package com.neroyun.mediator;
 
+import java.util.concurrent.CompletableFuture;
+
 public class UserCreatedEventHandler implements Handler<UserCreatedEvent, Void> {
 
     @Override
-    public Void handle(UserCreatedEvent message) {
-        return null;
+    public CompletableFuture<Void> handleAsync(UserCreatedEvent message) {
+        return CompletableFuture.completedFuture(null);
     }
 }

@@ -1,8 +1,10 @@
 package com.neroyun.mediator.internal;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
- * The next invocation of the middleware chain.
- * To invoke the next middleware or handler in the chain, call the invoke() method on this delegate.
+ * The next invocation of the middleware chain, supporting asynchronous execution.
+ * To invoke the next middleware or handler in the chain, call the invokeAsync() method on this delegate.
  * This delegate is passed to each middleware and handler in the chain, allowing them to control when the next middleware is invoked.
  * Middleware and handlers can choose to invoke the next middleware immediately,
  * or they can perform some processing before invoking the next middleware.
@@ -14,8 +16,8 @@ package com.neroyun.mediator.internal;
 @FunctionalInterface
 public interface MiddlewareDelegate {
     /**
-     * Invokes the next middleware or handler in the chain.
-     * @return the result of the next middleware or handler
+     * Invokes the next middleware or handler in the chain asynchronously.
+     * @return a CompletableFuture containing the result of the next middleware or handler
      */
-    Object invoke();
+    CompletableFuture<Object> invokeAsync();
 }

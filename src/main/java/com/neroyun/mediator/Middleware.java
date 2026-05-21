@@ -3,8 +3,10 @@ package com.neroyun.mediator;
 import com.neroyun.mediator.internal.Message;
 import com.neroyun.mediator.internal.MiddlewareDelegate;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
- * Represents a middleware that can be used in the mediator pipeline.
+ * Represents a middleware that can be used in the mediator pipeline for asynchronous processing.
  * Middleware can be used to perform additional processing on messages before they are handled by their respective handlers.
  * This can include tasks such as logging, validation, authentication,
  * or any other cross-cutting concerns that you want to apply to messages as they pass through the mediator.
@@ -15,10 +17,11 @@ import com.neroyun.mediator.internal.MiddlewareDelegate;
 public interface Middleware {
 
     /**
-     * Executes the middleware logic for the given message and then invokes the next middleware or handler in the chain.
+     * Executes the middleware logic asynchronously for the given message and then invokes the next middleware or handler in the chain.
      * @param message the message to be processed by the middleware
      * @param next the delegate to invoke the next middleware or handler in the chain
-     * @return the result of the next middleware or handler
+     * @return a CompletableFuture containing the result of the next middleware or handler
      */
-    Object handle(Message message, MiddlewareDelegate next);
+    @SuppressWarnings("rawtypes")
+    CompletableFuture<Object> handleAsync(Message message, MiddlewareDelegate next);
 }
