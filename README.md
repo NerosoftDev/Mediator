@@ -41,13 +41,18 @@
 ### 1. 定义 Command 与 Handler
 
 ```java
+import java.util.concurrent.CompletableFuture;
+
 public record UserCreateCommand(String name, String email) implements Command {}
 
 public class UserCreateCommandHandler implements Handler<UserCreateCommand, Void> {
     @Override
-    public Void handle(UserCreateCommand message) {
-        System.out.println("create user: " + message.email());
-        return null;
+    public CompletableFuture<Void> handleAsync(UserCreateCommand message) {
+        return CompletableFuture.supplyAsync(() -> {
+            System.out.println("create user: " + message.email());
+            // 执行业务逻辑
+            return null;
+        });
     }
 }
 ```
@@ -242,12 +247,11 @@ Mediator mediator = new PipelinedMediator()
 ```java
 (message, next) -> {
     long start = System.nanoTime();
-    try {
-        return next.invoke();
-    } finally {
+    return next.invokeAsync().thenApply(result -> {
         long cost = System.nanoTime() - start;
         System.out.println("cost(ns): " + cost);
-    }
+        return result;
+    });
 }
 ```
 
@@ -256,9 +260,24 @@ Mediator mediator = new PipelinedMediator()
 ```java
 (message, next) -> {
     if (message == null) {
-        throw new IllegalArgumentException("message can not be null");
+        return CompletableFuture.failedFuture(
+            new IllegalArgumentException("message can not be null")
+        );
     }
-    return next.invoke();
+    return next.invokeAsync();
+}
+```
+
+#### 异常处理和重试
+
+```java
+(message, next) -> {
+    return next.invokeAsync()
+        .exceptionally(ex -> {
+            System.err.println("Handler failed: " + ex.getMessage());
+            // 可以实现重试逻辑
+            return null;
+        });
 }
 ```
 
