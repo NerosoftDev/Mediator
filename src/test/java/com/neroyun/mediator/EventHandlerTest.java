@@ -3,7 +3,6 @@ package com.neroyun.mediator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,8 +29,7 @@ public class EventHandlerTest {
                 .use(() -> Stream.of(
                         new UserCreatedEventHandler(),
                         userEventCounter
-                ))
-                .use(() -> Executors.newFixedThreadPool(2));
+                ));
     }
 
     @Test

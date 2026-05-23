@@ -2,7 +2,6 @@ package com.neroyun.mediator;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 public class PipelinedMediatorTest {
@@ -12,8 +11,7 @@ public class PipelinedMediatorTest {
         mediator = new PipelinedMediator()
                 .use(() -> Stream.of(new UserCreateCommandHandler(), new UserCreatedEventHandler()))
                 .use(() -> Stream.of(new UserCreateCommandValidator()))
-                .use(() -> Stream.of(new LoggingMiddleware()))
-                .use(() -> Executors.newFixedThreadPool(4));
+                .use(() -> Stream.of(new LoggingMiddleware()));
     }
 
     @Test
