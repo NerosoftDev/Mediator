@@ -47,6 +47,7 @@ public record UserCreateCommand(String name, String email) implements Command {}
 
 public class UserCreateCommandHandler implements Handler<UserCreateCommand, Void> {
     @Override
+    @Async
     public CompletableFuture<Void> handleAsync(UserCreateCommand message) {
         return CompletableFuture.supplyAsync(() -> {
             System.out.println("create user: " + message.email());
@@ -96,7 +97,7 @@ Mediator mediator = new PipelinedMediator()
 ### 4. 发送消息
 
 ```java
-mediator.send(new UserCreateCommand("Alice", "alice@example.com"));
+mediator.sendAsync(new UserCreateCommand("Alice", "alice@example.com"));
 ```
 
 如校验失败，会抛出 `ValidationException`，可通过 `getErrors()` 读取错误列表。
@@ -123,7 +124,7 @@ mediator.send(new UserCreateCommand("Alice", "alice@example.com"));
 @Component
 public class UserCreateCommandHandler implements Handler<UserCreateCommand, Void> {
     @Override
-    public Void handle(UserCreateCommand message) {
+    public CompletableFuture<Void> handleAsync(UserCreateCommand message) {
         return null;
     }
 }
@@ -156,8 +157,7 @@ public class MediatorConfiguration {
     return new PipelinedMediator()
             .use(() -> applicationContext.getBeansOfType(Handler.class).values().stream())
             .use(() -> applicationContext.getBeansOfType(Validator.class).values().stream())
-            .use(() -> applicationContext.getBeansOfType(Middleware.class).values().stream())
-            .use(() -> Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
+            .use(() -> applicationContext.getBeansOfType(Middleware.class).values().stream());
   }
 }
 ```
@@ -200,7 +200,7 @@ import com.neroyun.mediator.internal.MiddlewareDelegate;
 
 @FunctionalInterface
 public interface Middleware {
-  Object handle(internal.com.neroyun.mediator.Message message, internal.com.neroyun.mediator.MiddlewareDelegate next);
+  CompletableFuture<Object> handleAsync(Message message, MiddlewareDelegate next);
 }
 ```
 
