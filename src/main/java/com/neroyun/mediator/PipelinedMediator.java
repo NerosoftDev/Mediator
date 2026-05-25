@@ -9,6 +9,7 @@ import com.neroyun.mediator.validation.ValidationResult;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -25,6 +26,8 @@ public class PipelinedMediator implements Mediator {
     private StreamSupplier<Middleware> middlewares = Stream::empty;
     private StreamSupplier<Validator> validators = Stream::empty;
     private Supplier<List<Handler>> handlerSupplier = () -> null;
+    private Function<Event, CompletableFuture<Void>> publisher = null;
+
 
     /**
      * Configures the mediator to use the provided stream of handlers for processing commands, queries, and events.
@@ -49,6 +52,11 @@ public class PipelinedMediator implements Mediator {
 
     public PipelinedMediator use(Supplier<List<Handler>> handlerSupplier) {
         this.handlerSupplier = handlerSupplier;
+        return this;
+    }
+
+    public PipelinedMediator use(Function<Event, CompletableFuture<Void>> publisher) {
+        this.publisher = publisher;
         return this;
     }
 
@@ -84,69 +92,74 @@ public class PipelinedMediator implements Mediator {
     public <T extends Event> CompletableFuture<Void> publishAsync(T event) {
         checkArguments(event, "Event can not be null.");
 
-        List<CompletableFuture<Void>> tasks = handlers.supply()
-                                                      .filter(handler -> handler.matches(event))
-                                                      .map(handler -> (Handler<Event, Void>) handler)
-                                                      .<CompletableFuture<Void>>map(handler -> {
-                                                          MiddlewareDelegate pipeline = buildMiddlewarePipeline(event, () -> handler.handleAsync(event).thenApply(v -> v));
-                                                          return pipeline.invokeAsync().thenApply(result -> null);
-                                                      })
-                                                      .toList();
+        if (publisher != null) {
+            return publisher.apply(event);
+        } else {
 
-        if (tasks.isEmpty()) {
-            return CompletableFuture.completedFuture(null);
-        }
+            List<CompletableFuture<Void>> tasks = handlers.supply()
+                                                          .filter(handler -> handler.matches(event))
+                                                          .map(handler -> (Handler<Event, Void>) handler)
+                                                          .<CompletableFuture<Void>>map(handler -> {
+                                                              MiddlewareDelegate pipeline = buildMiddlewarePipeline(event, () -> handler.handleAsync(event).thenApply(v -> v));
+                                                              return pipeline.invokeAsync().thenApply(result -> null);
+                                                          })
+                                                          .toList();
 
-        HandlerParallelStrategy parallelStrategy = event.getClass().getAnnotation(HandlerParallelStrategy.class);
-        HandlerExceptionStrategy exceptionStrategy = event.getClass().getAnnotation(HandlerExceptionStrategy.class);
+            if (tasks.isEmpty()) {
+                return CompletableFuture.completedFuture(null);
+            }
 
-        var parallelStrategyValue = parallelStrategy != null ? parallelStrategy.value() : HandlerParallelStrategy.No_WAIT;
-        var exceptionStrategyValue = exceptionStrategy != null ? exceptionStrategy.value() : HandlerExceptionStrategy.CONTINUE;
+            HandlerParallelStrategy parallelStrategy = event.getClass().getAnnotation(HandlerParallelStrategy.class);
+            HandlerExceptionStrategy exceptionStrategy = event.getClass().getAnnotation(HandlerExceptionStrategy.class);
 
-        List<Throwable> exceptions = new java.util.ArrayList<>();
+            var parallelStrategyValue = parallelStrategy != null ? parallelStrategy.value() : HandlerParallelStrategy.No_WAIT;
+            var exceptionStrategyValue = exceptionStrategy != null ? exceptionStrategy.value() : HandlerExceptionStrategy.CONTINUE;
 
-        switch (parallelStrategyValue) {
-            case HandlerParallelStrategy.No_WAIT -> {
-                // Fire and forget
-                tasks.forEach(task -> task.exceptionally(ex -> {
-                    if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
-                        throw new RuntimeException(ex);
-                    } else {
-                        synchronized (exceptions) {
-                            exceptions.add(ex);
+            List<Throwable> exceptions = new java.util.ArrayList<>();
+
+            switch (parallelStrategyValue) {
+                case HandlerParallelStrategy.No_WAIT -> {
+                    // Fire and forget
+                    tasks.forEach(task -> task.exceptionally(ex -> {
+                        if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
+                            throw new RuntimeException(ex);
+                        } else {
+                            synchronized (exceptions) {
+                                exceptions.add(ex);
+                            }
                         }
-                    }
-                    return null;
-                }));
-                return CompletableFuture.completedFuture(null);
-            }
-            case HandlerParallelStrategy.WHEN_ALL -> {
-                // Wait for all
-                return CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0]))
-                                        .exceptionally(ex -> {
-                                            if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
-                                                throw new RuntimeException(ex);
-                                            } else {
-                                                exceptions.add(ex);
-                                            }
-                                            return null;
-                                        });
-            }
-            case HandlerParallelStrategy.WHEN_ANY -> {
-                // Wait for any
-                return CompletableFuture.anyOf(tasks.toArray(new CompletableFuture[0]))
-                                        .thenApply(result -> Void.TYPE.cast(null))
-                                        .exceptionally(ex -> {
-                                            if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
-                                                throw new RuntimeException(ex);
-                                            } else {
-                                                exceptions.add(ex);
-                                            }
-                                            return null;
-                                        });
-            }
-            default -> {
-                return CompletableFuture.completedFuture(null);
+                        return null;
+                    }));
+                    return CompletableFuture.completedFuture(null);
+                }
+                case HandlerParallelStrategy.WHEN_ALL -> {
+                    // Wait for all
+                    return CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0]))
+                                            .exceptionally(ex -> {
+                                                if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
+                                                    throw new RuntimeException(ex);
+                                                } else {
+                                                    exceptions.add(ex);
+                                                }
+                                                return null;
+                                            });
+                }
+                case HandlerParallelStrategy.WHEN_ANY -> {
+                    // Wait for any
+                    return CompletableFuture.anyOf(tasks.toArray(new CompletableFuture[0]))
+                                            .thenApply(result -> Void.TYPE.cast(null))
+                                            .exceptionally(ex -> {
+                                                if (Objects.equals(exceptionStrategyValue, HandlerExceptionStrategy.STOP)) {
+                                                    throw new RuntimeException(ex);
+                                                } else {
+                                                    exceptions.add(ex);
+                                                }
+                                                return null;
+                                            });
+                }
+                default -> {
+                    return CompletableFuture.completedFuture(null);
+                }
             }
         }
     }
