@@ -3,6 +3,7 @@ package com.neroyun.mediator;
 import com.neroyun.mediator.internal.QueryCallback;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * Defines the Mediator interface for handling commands, queries, and events asynchronously.
@@ -23,6 +24,16 @@ public interface Mediator {
     <T extends Command> CompletableFuture<Void> sendAsync(T command);
 
     /**
+     * Sends a command to the appropriate handler asynchronously with a contextConsumer consumer for additional metadata.
+     *
+     * @param command         the command to be sent
+     * @param contextConsumer the contextConsumer consumer for additional metadata
+     * @param <T>             the type of the command
+     * @return a CompletableFuture that completes when the command is processed
+     */
+    <T extends Command> CompletableFuture<Void> sendAsync(T command, Consumer<MessageContext> contextConsumer);
+
+    /**
      * Executes a query asynchronously and returns the result.
      *
      * @param query the query to be executed
@@ -31,6 +42,17 @@ public interface Mediator {
      * @return a CompletableFuture containing the result of the query
      */
     <T extends Query<R>, R> CompletableFuture<R> executeAsync(T query);
+
+    /**
+     * Executes a query asynchronously with a contextConsumer consumer for additional metadata and returns the result.
+     *
+     * @param query           the query to be executed
+     * @param contextConsumer the contextConsumer consumer for additional metadata
+     * @param <T>             the type of the query
+     * @param <R>             the type of the result
+     * @return a CompletableFuture containing the result of the query
+     */
+    <T extends Query<R>, R> CompletableFuture<R> executeAsync(T query, Consumer<MessageContext> contextConsumer);
 
     /**
      * Executes a query asynchronously and provides the result to the specified response handler.

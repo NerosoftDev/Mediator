@@ -11,11 +11,11 @@ public class UserEventCounterHandler implements Handler<UserCreatedEvent, Void> 
     private final AtomicInteger counter = new AtomicInteger(0);
 
     @Override
-    public CompletableFuture<Void> handleAsync(UserCreatedEvent message) {
+    public CompletableFuture<Void> handleAsync(UserCreatedEvent message, MessageContext messageContext) {
         return CompletableFuture.supplyAsync(() -> {
             counter.incrementAndGet();
             System.out.printf("UserEventCounterHandler: Counted event for user %s (Total: %d)\n",
-                             message.name(), counter.get());
+                    message.name(), counter.get());
             return null;
         });
     }

@@ -3,6 +3,7 @@ package com.neroyun.mediator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,7 +40,7 @@ public class EventHandlerTest {
         UserCreatedEventHandler handler = new UserCreatedEventHandler();
 
         // Act - wait for async operation to complete
-        Void result = handler.handleAsync(event).join();
+        Void result = handler.handleAsync(event, new MessageContext(UUID.randomUUID().toString())).join();
 
         // Assert
         assertNull(result, "Event handler should return null (Void)");
@@ -52,7 +53,7 @@ public class EventHandlerTest {
         UserCreatedEventHandler handler = new UserCreatedEventHandler();
 
         // Act - wait for async operation to complete
-        Void result = handler.handleAsync(event).join();
+        Void result = handler.handleAsync(event, new MessageContext(UUID.randomUUID().toString())).join();
 
         // Assert
         assertNull(result, "Event handler should return null (Void)");
@@ -112,8 +113,8 @@ public class EventHandlerTest {
     void testEventHandlerWithNullParameters() {
         // Arrange & Act & Assert
         assertThrows(Exception.class,
-            () -> mediator.publishAsync(null).join(),
-            "Publishing null event should throw an exception");
+                () -> mediator.publishAsync(null).join(),
+                "Publishing null event should throw an exception");
     }
 
     @Test

@@ -18,9 +18,10 @@ public interface Handler<T extends Message<R>, R> {
     /**
      * Handles the given message asynchronously and produces a response.
      * @param message the message to be processed by this handler
+     * @param context the context of the message, containing metadata and other relevant information for processing
      * @return a CompletableFuture containing the response produced by handling the message
      */
-    CompletableFuture<R> handleAsync(T message);
+    CompletableFuture<R> handleAsync(T message, MessageContext context);
 
     /**
      * Determines if this handler can process the given message based on its type.

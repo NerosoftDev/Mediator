@@ -8,7 +8,9 @@ import com.neroyun.mediator.validation.ValidationResult;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -22,6 +24,8 @@ import java.util.stream.Stream;
  */
 @SuppressWarnings({"rawtypes", "unchecked", "unused"})
 public class PipelinedMediator implements Mediator {
+    private static final String[] possible_message_ids = {"messageId", "id", "requestId", "commandId", "queryId", "eventId"};
+
     private StreamSupplier<Handler> handlers = Stream::empty;
     private StreamSupplier<Middleware> middlewares = Stream::empty;
     private StreamSupplier<Validator> validators = Stream::empty;
@@ -64,8 +68,30 @@ public class PipelinedMediator implements Mediator {
     public <T extends Command> CompletableFuture<Void> sendAsync(T command) {
         checkArguments(command, "Command can not be null.");
         validate(command);
+        var messageId = getMessageId(command);
+        if (messageId == null) {
+            messageId = UUID.randomUUID().toString();
+        }
+        var context = new MessageContext(messageId);
         var handler = resolveHandler(command);
-        MiddlewareDelegate pipeline = buildMiddlewarePipeline(command, () -> handler.handleAsync(command).thenApply(v -> v));
+        MiddlewareDelegate pipeline = buildMiddlewarePipeline(command, () -> handler.handleAsync(command, context).thenApply(v -> v));
+        return pipeline.invokeAsync().thenApply(result -> null);
+    }
+
+    @Override
+    public <T extends Command> CompletableFuture<Void> sendAsync(T command, Consumer<MessageContext> contextConsumer) {
+        checkArguments(command, "Command can not be null.");
+        validate(command);
+        var messageId = getMessageId(command);
+        if (messageId == null) {
+            messageId = UUID.randomUUID().toString();
+        }
+        var context = new MessageContext(messageId);
+        if (contextConsumer != null) {
+            contextConsumer.accept(context);
+        }
+        var handler = resolveHandler(command);
+        MiddlewareDelegate pipeline = buildMiddlewarePipeline(command, () -> handler.handleAsync(command, context).thenApply(v -> v));
         return pipeline.invokeAsync().thenApply(result -> null);
     }
 
@@ -73,8 +99,30 @@ public class PipelinedMediator implements Mediator {
     public <T extends Query<R>, R> CompletableFuture<R> executeAsync(T query) {
         checkArguments(query, "Query can not be null.");
         validate(query);
+        var messageId = getMessageId(query);
+        if (messageId == null) {
+            messageId = UUID.randomUUID().toString();
+        }
+        var context = new MessageContext(messageId);
         var handler = resolveHandler(query);
-        MiddlewareDelegate pipeline = buildMiddlewarePipeline(query, () -> handler.handleAsync(query).thenApply(r -> r));
+        MiddlewareDelegate pipeline = buildMiddlewarePipeline(query, () -> handler.handleAsync(query, context).thenApply(r -> r));
+        return pipeline.invokeAsync().thenApply(result -> (R) result);
+    }
+
+    @Override
+    public <T extends Query<R>, R> CompletableFuture<R> executeAsync(T query, Consumer<MessageContext> contextConsumer) {
+        checkArguments(query, "Query can not be null.");
+        validate(query);
+        var messageId = getMessageId(query);
+        if (messageId == null) {
+            messageId = UUID.randomUUID().toString();
+        }
+        var context = new MessageContext(messageId);
+        if (contextConsumer != null) {
+            contextConsumer.accept(context);
+        }
+        var handler = resolveHandler(query);
+        MiddlewareDelegate pipeline = buildMiddlewarePipeline(query, () -> handler.handleAsync(query, context).thenApply(r -> r));
         return pipeline.invokeAsync().thenApply(result -> (R) result);
     }
 
@@ -91,7 +139,11 @@ public class PipelinedMediator implements Mediator {
     @Override
     public <T extends Event> CompletableFuture<Void> publishAsync(T event) {
         checkArguments(event, "Event can not be null.");
-
+        var messageId = getMessageId(event);
+        if (messageId == null) {
+            messageId = UUID.randomUUID().toString();
+        }
+        var context = new MessageContext(messageId);
         if (publisher != null) {
             return publisher.apply(event);
         } else {
@@ -100,7 +152,7 @@ public class PipelinedMediator implements Mediator {
                                                           .filter(handler -> handler.matches(event))
                                                           .map(handler -> (Handler<Event, Void>) handler)
                                                           .<CompletableFuture<Void>>map(handler -> {
-                                                              MiddlewareDelegate pipeline = buildMiddlewarePipeline(event, () -> handler.handleAsync(event).thenApply(v -> v));
+                                                              MiddlewareDelegate pipeline = buildMiddlewarePipeline(event, () -> handler.handleAsync(event, context).thenApply(v -> v));
                                                               return pipeline.invokeAsync().thenApply(result -> null);
                                                           })
                                                           .toList();
@@ -237,5 +289,33 @@ public class PipelinedMediator implements Mediator {
             delegate = () -> middleware.handleAsync(message, next);
         }
         return delegate;
+    }
+
+    /**
+     * Attempts to extract a message ID from the given message by checking for common field names that may represent the message ID.
+     * It uses reflection to access the fields of the message and returns the value of the first non-null field that matches one of the common message ID field names.
+     * If no such field is found, it returns null.
+     * This method is useful for generating unique identifiers for messages when they are not explicitly provided, allowing for better tracking and correlation of messages in the mediator pattern.
+     *
+     * @param message the message object from which to extract the ID
+     * @return the extracted message ID, or null if no ID is found
+     */
+    private String getMessageId(Object message) {
+        var type = message.getClass();
+
+        for (var name : possible_message_ids) {
+            try {
+                var field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                var value = field.get(message);
+                if (value != null) {
+                    return value.toString();
+                }
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                // Ignore and try next
+            }
+        }
+
+        return null;
     }
 }

@@ -4,7 +4,7 @@ import java.util.concurrent.CompletableFuture;
 
 public class UserCreateCommandHandler implements Handler<UserCreateCommand, Void> {
     @Override
-    public CompletableFuture<Void> handleAsync(UserCreateCommand message) {
+    public CompletableFuture<Void> handleAsync(UserCreateCommand message, MessageContext messageContext) {
         return CompletableFuture.supplyAsync(() -> {
             System.out.printf("UserCreateCommandHandler received command: %s\n", message);
             User user = new User(System.currentTimeMillis(), message.name(), message.email());
