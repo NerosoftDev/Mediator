@@ -3,7 +3,7 @@ package com.neroyun.mediator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.Executors;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,8 +30,7 @@ public class EventHandlerTest {
                 .use(() -> Stream.of(
                         new UserCreatedEventHandler(),
                         userEventCounter
-                ))
-                .use(() -> Executors.newFixedThreadPool(2));
+                ));
     }
 
     @Test
@@ -40,8 +39,8 @@ public class EventHandlerTest {
         UserCreatedEvent event = new UserCreatedEvent(123L, "Jane Doe");
         UserCreatedEventHandler handler = new UserCreatedEventHandler();
 
-        // Act
-        Void result = handler.handle(event);
+        // Act - wait for async operation to complete
+        Void result = handler.handleAsync(event, new MessageContext(UUID.randomUUID().toString())).join();
 
         // Assert
         assertNull(result, "Event handler should return null (Void)");
@@ -53,8 +52,8 @@ public class EventHandlerTest {
         UserCreatedEvent event = new UserCreatedEvent(456L, "John Smith");
         UserCreatedEventHandler handler = new UserCreatedEventHandler();
 
-        // Act
-        Void result = handler.handle(event);
+        // Act - wait for async operation to complete
+        Void result = handler.handleAsync(event, new MessageContext(UUID.randomUUID().toString())).join();
 
         // Assert
         assertNull(result, "Event handler should return null (Void)");
@@ -78,8 +77,8 @@ public class EventHandlerTest {
         // Arrange
         UserCreatedEvent event = new UserCreatedEvent(999L, "No Exception User");
 
-        // Act & Assert
-        assertDoesNotThrow(() -> mediator.publish(event), "Publishing an event should not throw an exception");
+        // Act & Assert - wait for async operation to complete
+        assertDoesNotThrow(() -> mediator.publishAsync(event).join(), "Publishing an event should not throw an exception");
     }
 
     @Test
@@ -87,15 +86,8 @@ public class EventHandlerTest {
         // Arrange
         UserCreatedEvent event = new UserCreatedEvent(100L, "Multiple Handlers User");
 
-        // Act
-        mediator.publish(event);
-
-        // Give handlers time to process (since they run asynchronously)
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        // Act - wait for async event publishing to complete
+        mediator.publishAsync(event).join();
 
         // Assert
         assertTrue(userEventCounter.getCount() > 0, "Counter handler should have been invoked");
@@ -108,17 +100,10 @@ public class EventHandlerTest {
         UserCreatedEvent event2 = new UserCreatedEvent(2L, "Second User");
         UserCreatedEvent event3 = new UserCreatedEvent(3L, "Third User");
 
-        // Act
-        mediator.publish(event1);
-        mediator.publish(event2);
-        mediator.publish(event3);
-
-        // Give handlers time to process
-        try {
-            Thread.sleep(200);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        // Act - wait for each async event publishing to complete
+        mediator.publishAsync(event1).join();
+        mediator.publishAsync(event2).join();
+        mediator.publishAsync(event3).join();
 
         // Assert
         assertEquals(3, userEventCounter.getCount(), "Handler should have handled 3 events");
@@ -127,9 +112,9 @@ public class EventHandlerTest {
     @Test
     void testEventHandlerWithNullParameters() {
         // Arrange & Act & Assert
-        assertThrows(IllegalArgumentException.class,
-            () -> mediator.publish(null),
-            "Publishing null event should throw IllegalArgumentException");
+        assertThrows(Exception.class,
+                () -> mediator.publishAsync(null).join(),
+                "Publishing null event should throw an exception");
     }
 
     @Test

@@ -1,25 +1,28 @@
 # Mediator
 
-A lightweight Java Mediator library for CQRS scenarios, supporting unified handling of `Command`, `Query`, and `Event` with middleware pipelines, message validation, and event parallel dispatch strategies.
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.neroyun/mediator)](https://central.sonatype.com/artifact/com.neroyun/mediator)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/NerosoftDev/Mediator/blob/master/LICENSE)
 
 ## Overview
 
-`Mediator` decouples message senders from their handlers using a message-driven approach:
+`Mediator` decouples message senders from their handlers using a message-driven approach with **asynchronous architecture** for better performance and scalability:
 
 - **`Command`** — Triggers an action (typically no return value)
 - **`Query<R>`** — Requests data and returns a result of type `R`
 - **`Event`** — Publishes a notification that can be handled by multiple subscribers
 
+All operations execute asynchronously via `CompletableFuture`, and method names follow the `xxxAsync` convention to clearly indicate asynchronous behavior.
+
 The default implementation is `PipelinedMediator`, which provides:
 
-- Automatic handler resolution by message type (`Handler<T, R>`)
-- Middleware pipeline support (`Middleware`)
-- Message validation (`Validator<T>`), throwing `ValidationException` on failure
-- Event parallel dispatch strategies (`HandlerParallelStrategy`)
-- Event exception handling strategies (`HandlerExceptionStrategy`)
+- ✅ **Asynchronous Processing**: All operations based on `CompletableFuture`, non-blocking execution
+- ✅ **Automatic handler resolution** by message type (`Handler<T, R>`)
+- ✅ **Middleware pipeline support** (`Middleware`)
+- ✅ **Message validation** (`Validator<T>`), throwing `ValidationException` on failure
+- ✅ **Event parallel dispatch strategies** (`HandlerParallelStrategy`)
+- ✅ **Event exception handling strategies** (`HandlerExceptionStrategy`)
+- ✅ **Clear naming convention**: All async methods use `xxxAsync` suffix
 
 ## Requirements
 
@@ -258,6 +261,7 @@ public class MediatorConfiguration {
 ```java
 import com.neroyun.mediator.Mediator;
 import org.springframework.stereotype.Service;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class UserApplicationService {
@@ -267,8 +271,13 @@ public class UserApplicationService {
         this.mediator = mediator;
     }
 
-    public void createUser(String name, String email) {
-        mediator.send(new UserCreateCommand(name, email));
+    public CompletableFuture<Void> createUser(String name, String email) {
+        return mediator.sendAsync(new UserCreateCommand(name, email));
+    }
+    
+    // Or wait synchronously for completion
+    public void createUserSync(String name, String email) {
+        mediator.sendAsync(new UserCreateCommand(name, email)).join();
     }
 }
 ```

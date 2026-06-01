@@ -41,13 +41,19 @@
 ### 1. 定义 Command 与 Handler
 
 ```java
+import java.util.concurrent.CompletableFuture;
+
 public record UserCreateCommand(String name, String email) implements Command {}
 
 public class UserCreateCommandHandler implements Handler<UserCreateCommand, Void> {
     @Override
-    public Void handle(UserCreateCommand message) {
-        System.out.println("create user: " + message.email());
-        return null;
+    @Async
+    public CompletableFuture<Void> handleAsync(UserCreateCommand message) {
+        return CompletableFuture.supplyAsync(() -> {
+            System.out.println("create user: " + message.email());
+            // 执行业务逻辑
+            return null;
+        });
     }
 }
 ```
@@ -91,7 +97,7 @@ Mediator mediator = new PipelinedMediator()
 ### 4. 发送消息
 
 ```java
-mediator.send(new UserCreateCommand("Alice", "alice@example.com"));
+mediator.sendAsync(new UserCreateCommand("Alice", "alice@example.com"));
 ```
 
 如校验失败，会抛出 `ValidationException`，可通过 `getErrors()` 读取错误列表。
@@ -118,7 +124,7 @@ mediator.send(new UserCreateCommand("Alice", "alice@example.com"));
 @Component
 public class UserCreateCommandHandler implements Handler<UserCreateCommand, Void> {
     @Override
-    public Void handle(UserCreateCommand message) {
+    public CompletableFuture<Void> handleAsync(UserCreateCommand message) {
         return null;
     }
 }
@@ -151,8 +157,7 @@ public class MediatorConfiguration {
     return new PipelinedMediator()
             .use(() -> applicationContext.getBeansOfType(Handler.class).values().stream())
             .use(() -> applicationContext.getBeansOfType(Validator.class).values().stream())
-            .use(() -> applicationContext.getBeansOfType(Middleware.class).values().stream())
-            .use(() -> Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
+            .use(() -> applicationContext.getBeansOfType(Middleware.class).values().stream());
   }
 }
 ```
@@ -195,7 +200,7 @@ import com.neroyun.mediator.internal.MiddlewareDelegate;
 
 @FunctionalInterface
 public interface Middleware {
-  Object handle(internal.com.neroyun.mediator.Message message, internal.com.neroyun.mediator.MiddlewareDelegate next);
+  CompletableFuture<Object> handleAsync(Message message, MiddlewareDelegate next);
 }
 ```
 
@@ -242,12 +247,11 @@ Mediator mediator = new PipelinedMediator()
 ```java
 (message, next) -> {
     long start = System.nanoTime();
-    try {
-        return next.invoke();
-    } finally {
+    return next.invokeAsync().thenApply(result -> {
         long cost = System.nanoTime() - start;
         System.out.println("cost(ns): " + cost);
-    }
+        return result;
+    });
 }
 ```
 
@@ -256,9 +260,24 @@ Mediator mediator = new PipelinedMediator()
 ```java
 (message, next) -> {
     if (message == null) {
-        throw new IllegalArgumentException("message can not be null");
+        return CompletableFuture.failedFuture(
+            new IllegalArgumentException("message can not be null")
+        );
     }
-    return next.invoke();
+    return next.invokeAsync();
+}
+```
+
+#### 异常处理和重试
+
+```java
+(message, next) -> {
+    return next.invokeAsync()
+        .exceptionally(ex -> {
+            System.err.println("Handler failed: " + ex.getMessage());
+            // 可以实现重试逻辑
+            return null;
+        });
 }
 ```
 

@@ -3,8 +3,10 @@ package com.neroyun.mediator;
 import com.neroyun.mediator.internal.Generic;
 import com.neroyun.mediator.internal.Message;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
- * Defines a handler interface for processing messages of type T and producing a response of type R.
+ * Defines a handler interface for processing messages of type T and producing a response of type R asynchronously.
  * This interface is a key component of the mediator pattern,
  * allowing for the decoupling of message senders and receivers by providing a common contract for handling messages.
  * Implementations of this interface will contain the logic to process specific types of messages and generate appropriate responses,
@@ -14,11 +16,12 @@ import com.neroyun.mediator.internal.Message;
  */
 public interface Handler<T extends Message<R>, R> {
     /**
-     * Handles the given message and produces a response.
+     * Handles the given message asynchronously and produces a response.
      * @param message the message to be processed by this handler
-     * @return the response produced by handling the message
+     * @param context the context of the message, containing metadata and other relevant information for processing
+     * @return a CompletableFuture containing the response produced by handling the message
      */
-    R handle(T message);
+    CompletableFuture<R> handleAsync(T message, MessageContext context);
 
     /**
      * Determines if this handler can process the given message based on its type.
